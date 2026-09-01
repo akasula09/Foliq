@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Preview — Foliq</title>
+<link rel="stylesheet" href="/style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/render.js"></script>
+<style>
+  .bar{ display:flex; align-items:center; justify-content:space-between; padding: 16px 24px; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:12px; }
+  .bar .left{ display:flex; align-items:center; gap:12px; }
+  .bar .right{ display:flex; align-items:center; gap:10px; }
+  .frame-wrap{ padding: 28px; display:flex; justify-content:center; }
+  iframe{ width:100%; max-width: 860px; height: calc(100vh - 150px); border:1px solid var(--border); border-radius: 18px; background:#0b0c10; box-shadow: var(--shadow); }
+  .published-modal{ position:fixed; inset:0; background:rgba(6,6,10,.7); backdrop-filter: blur(6px); display:none; place-items:center; z-index:100; padding:20px; }
+  .published-modal.show{ display:grid; }
+  .modal-card{ max-width:460px; width:100%; text-align:center; padding: 40px 30px; }
+  .modal-card .check{ width:56px; height:56px; border-radius:50%; background: var(--gradient); display:grid; place-items:center; margin: 0 auto 18px; font-size:26px; }
+  .link-box{ display:flex; gap:8px; margin: 20px 0 6px; }
+  .link-box input{ flex:1; }
+  .loading{ padding: 100px 0; text-align:center; color:var(--text-faint); }
+</style>
+</head>
+<body>
+
+<nav class="bar">
+  <div class="left">
+    <a class="brand" href="/dashboard.html"><span class="brand-mark">F</span>Foliq</a>
+    <span class="pill" id="status-pill">● Draft</span>
+  </div>
+  <div class="right">
+    <a class="btn btn-ghost btn-sm" href="/dashboard.html">← Dashboard</a>
+    <a class="btn btn-ghost btn-sm" id="edit-link" href="#">Edit</a>
+    <button class="btn btn-primary btn-sm" id="publish-btn">Publish</button>
+  </div>
+</nav>
+
+<div id="loading" class="loading">Loading preview…</div>
+<div class="frame-wrap" id="frame-wrap" style="display:none">
+  <iframe id="preview-frame"></iframe>
+</div>
+
+<div class="published-modal" id="published-modal">
+  <div class="card modal-card">
+    <div class="check">✓</div>
+    <h2>You're live!</h2>
+    <p class="muted">Your portfolio is published and ready to share.</p>
+    <div class="link-box">
+      <input class="input" id="live-link" readonly/>
+      <button class="btn btn-ghost btn-sm" id="copy-link">Copy</button>
+    </div>
+    <a class="btn btn-primary btn-block" id="view-live" target="_blank" style="margin-top:16px">View live site →</a>
+    <button class="btn btn-ghost btn-block" id="close-modal" style="margin-top:10px">Keep editing</button>
+  </div>
+</div>
+
+<script>
+let supabase, user, portfolio;
+const params = new URLSearchParams(location.search);
+const id = params.get('id');
+
+async function boot() {
+  const cfg = await fetch('/api/config').then(r => r.json());
+  supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { window.location.href = '/login.html'; return; }
+  user = session.user;
+
+  if (!id) { window.location.href = '/dashboard.html'; return; }
+
+  const { data, error } = await supabase.from('portfolios').select('*').eq('id', id).single();
+  if (error || !data) { window.location.href = '/dashboard.html'; return; }
+  portfolio = data;
+
+  document.getElementById('edit-link').href = '/editor.html?id=' + id;
+  renderPreview();
+  updateStatusUI();
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('frame-wrap').style.display = 'flex';
+}
+
+function renderPreview() {
+  const iframe = document.getElementById('preview-frame');
+  iframe.srcdoc = Foliq.fullDocument(portfolio.data, { editable: false });
+}
+
+function updateStatusUI() {
+  const pill = document.getElementById('status-pill');
+  if (portfolio.published) {
+    pill.textContent = '● Published';
+    pill.style.background = 'rgba(52,226,196,.12)'; pill.style.color = '#7ff3dc'; pill.style.borderColor='rgba(52,226,196,.3)';
+  } else {
+    pill.textContent = '● Draft';
+    pill.style.background=''; pill.style.color=''; pill.style.borderColor='';
+  }
+}
+
+async function publish() {
+  const btn = document.getElementById('publish-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+  let slug = portfolio.slug;
+  if (!slug) {
+    const base = Foliq.slugify(portfolio.name);
+    slug = base;
+    // ensure uniqueness
+    let attempt = 0;
+    while (true) {
+      const { data: existing } = await supabase.from('portfolios').select('id').eq('slug', slug).neq('id', portfolio.id).maybeSingle();
+      if (!existing) break;
+      attempt++;
+      slug = base + '-' + Math.random().toString(36).slice(2, 5);
+      if (attempt > 5) break;
+    }
+  }
+
+  const { data, error } = await supabase.from('portfolios')
+    .update({ published: true, slug })
+    .eq('id', portfolio.id).select().single();
+
+  btn.disabled = false; btn.textContent = 'Publish';
+
+  if (error) { alert(error.message); return; }
+  portfolio = data;
+  updateStatusUI();
+
+  const url = window.location.origin + '/portfolio?name=' + encodeURIComponent(portfolio.slug);
+  document.getElementById('live-link').value = url;
+  document.getElementById('view-live').href = url;
+  document.getElementById('published-modal').classList.add('show');
+}
+
+document.getElementById('publish-btn').addEventListener('click', publish);
+document.getElementById('close-modal').addEventListener('click', () => document.getElementById('published-modal').classList.remove('show'));
+document.getElementById('copy-link').addEventListener('click', () => {
+  const input = document.getElementById('live-link');
+  input.select(); document.execCommand('copy');
+  const btn = document.getElementById('copy-link');
+  btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500);
+});
+
+boot();
+</script>
+</body>
+</html>

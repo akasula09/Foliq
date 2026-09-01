@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Dashboard — Foliq</title>
+<link rel="stylesheet" href="/style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  .top{ padding: 40px 0 10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
+  .top h1{ font-size:28px; margin-bottom:4px; }
+  .grid{ display:grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap:18px; margin: 28px 0 80px; }
+  .pcard{ padding:22px; display:flex; flex-direction:column; gap:14px; }
+  .pcard .swatch{ height:70px; border-radius:12px; }
+  .pcard h3{ font-size:17px; margin:0; }
+  .pcard .meta{ font-size:13px; color:var(--text-faint); }
+  .pcard .actions{ display:flex; gap:8px; margin-top:auto; }
+  .new-card{ border-style:dashed; align-items:center; justify-content:center; text-align:center; cursor:pointer; min-height: 210px; color:var(--text-dim); }
+  .new-card:hover{ border-color: var(--accent); color:var(--text); }
+  .new-card .plus{ font-size:30px; margin-bottom:8px; }
+  .empty{ text-align:center; padding: 60px 20px; }
+  .loading{ padding: 80px 0; text-align:center; color:var(--text-faint); }
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a class="brand" href="/index.html"><span class="brand-mark">F</span>Foliq</a>
+  <div class="row" style="gap:10px">
+    <span class="muted" id="who" style="font-size:13px"></span>
+    <button class="btn btn-ghost btn-sm" id="logout">Log out</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="top">
+    <div>
+      <h1>Your portfolios</h1>
+      <p class="muted" style="margin:0">Create a new one or jump back into an existing draft.</p>
+    </div>
+  </div>
+
+  <div id="loading" class="loading">Loading your portfolios…</div>
+  <div id="grid" class="grid" style="display:none"></div>
+</div>
+
+<script>
+let supabase, user;
+
+function themeGradient(name) {
+  const map = {
+    midnight:'linear-gradient(135deg,#7c5cff,#ff6b9d)', sunset:'linear-gradient(135deg,#ff8a4c,#ff4d8d)',
+    forest:'linear-gradient(135deg,#34c98f,#9be15d)', mono:'linear-gradient(135deg,#ffffff,#8f8f8f)',
+    ocean:'linear-gradient(135deg,#3fc8ff,#5b7dff)', terminal:'linear-gradient(135deg,#43ff8c,#ffd23f)'
+  };
+  return map[name] || map.midnight;
+}
+
+function card(p) {
+  const theme = (p.data && p.data.theme) || 'midnight';
+  const name = p.name || 'Untitled';
+  const status = p.published
+    ? `<span class="pill" style="background:rgba(52,226,196,.12);color:#7ff3dc;border-color:rgba(52,226,196,.3)">● Published</span>`
+    : `<span class="pill">● Draft</span>`;
+  const viewBtn = p.published
+    ? `<a class="btn btn-ghost btn-sm" href="/portfolio?name=${encodeURIComponent(p.slug)}" target="_blank">View live</a>`
+    : `<a class="btn btn-ghost btn-sm" href="/preview.html?id=${p.id}">Preview</a>`;
+  const div = document.createElement('div');
+  div.className = 'card pcard';
+  div.innerHTML = `
+    <div class="swatch" style="background:${themeGradient(theme)}"></div>
+    <div>
+      <h3>${name}</h3>
+      <div class="meta">${status} &nbsp;·&nbsp; updated ${new Date(p.updated_at).toLocaleDateString()}</div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-primary btn-sm" href="/editor.html?id=${p.id}">Edit</a>
+      ${viewBtn}
+    </div>`;
+  return div;
+}
+
+async function boot() {
+  const cfg = await fetch('/api/config').then(r => r.json());
+  supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { window.location.href = '/login.html'; return; }
+  user = session.user;
+  document.getElementById('who').textContent = user.email;
+
+  document.getElementById('logout').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/index.html';
+  });
+
+  const { data: portfolios, error } = await supabase
+    .from('portfolios')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false });
+
+  document.getElementById('loading').style.display = 'none';
+  const grid = document.getElementById('grid');
+  grid.style.display = 'grid';
+
+  (portfolios || []).forEach(p => grid.appendChild(card(p)));
+
+  const newCard = document.createElement('a');
+  newCard.href = '/onboarding.html';
+  newCard.className = 'card new-card pcard';
+  newCard.innerHTML = `<div class="plus">+</div><div>New portfolio</div>`;
+  grid.appendChild(newCard);
+
+  if (error) console.error(error);
+}
+boot();
+</script>
+</body>
+</html>

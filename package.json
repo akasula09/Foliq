@@ -1,0 +1,7 @@
+{
+  "name": "foliq",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Foliq — AI-generated personal portfolio builder.",
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Portfolio — Foliq</title>
+<link id="theme-style" rel="stylesheet" href="data:text/css,"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/render.js"></script>
+<style>
+  html,body{ margin:0; background:#0b0c10; }
+  .foliq-state{ min-height:100vh; display:grid; place-items:center; color:#a7abba; font-family: system-ui, sans-serif; text-align:center; padding: 24px; }
+  .foliq-badge{
+    position: fixed; bottom: 18px; right: 18px; z-index: 40;
+    font-family: system-ui, sans-serif; font-size:12px; color:#cfcfe0;
+    background: rgba(20,20,30,.7); backdrop-filter: blur(8px);
+    border:1px solid rgba(255,255,255,.12); padding:8px 14px; border-radius:100px;
+    text-decoration:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="state" class="foliq-state">Loading…</div>
+<div id="root"></div>
+
+<script>
+async function boot() {
+  const params = new URLSearchParams(location.search);
+  const slug = params.get('name');
+  const stateEl = document.getElementById('state');
+
+  if (!slug) {
+    stateEl.innerHTML = '<div><h2 style="color:#fff">No portfolio specified</h2><p>Add ?name=their-slug to the URL.</p></div>';
+    return;
+  }
+
+  try {
+    const cfg = await fetch('/api/config').then(r => r.json());
+    const supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+
+    const { data, error } = await supabase
+      .from('portfolios')
+      .select('name, data, published')
+      .eq('slug', slug)
+      .eq('published', true)
+      .maybeSingle();
+
+    if (error || !data) {
+      stateEl.innerHTML = '<div><h2 style="color:#fff">Portfolio not found</h2><p>This link might be unpublished or no longer exists.</p></div>';
+      return;
+    }
+
+    document.title = data.name + ' — Portfolio';
+    document.getElementById('theme-style').outerHTML = '<style>' + Foliq.themeCSS(data.data.theme) + '</style>';
+    document.getElementById('root').innerHTML = Foliq.renderBody(data.data, { editable: false });
+    stateEl.remove();
+
+    const badge = document.createElement('a');
+    badge.className = 'foliq-badge';
+    badge.href = '/index.html'; badge.textContent = 'Made with Foliq ✦';
+    document.body.appendChild(badge);
+
+    Foliq.initTriggers(document.getElementById('root'));
+  } catch (e) {
+    stateEl.innerHTML = '<div><h2 style="color:#fff">Something went wrong</h2><p>Please try again shortly.</p></div>';
+  }
+}
+boot();
+</script>
+</body>
+</html>
