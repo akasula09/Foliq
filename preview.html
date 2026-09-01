@@ -56,20 +56,20 @@
 </div>
 
 <script>
-let supabase, user, portfolio;
+let user, portfolio, supabaseClient;
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
 
 async function boot() {
   const cfg = await fetch('/api/config').then(r => r.json());
-  supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
-  const { data: { session } } = await supabase.auth.getSession();
+  supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+  const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) { window.location.href = '/login.html'; return; }
   user = session.user;
 
   if (!id) { window.location.href = '/dashboard.html'; return; }
 
-  const { data, error } = await supabase.from('portfolios').select('*').eq('id', id).single();
+  const { data, error } = await supabaseClient.from('portfolios').select('*').eq('id', id).single();
   if (error || !data) { window.location.href = '/dashboard.html'; return; }
   portfolio = data;
 
@@ -108,7 +108,7 @@ async function publish() {
     // ensure uniqueness
     let attempt = 0;
     while (true) {
-      const { data: existing } = await supabase.from('portfolios').select('id').eq('slug', slug).neq('id', portfolio.id).maybeSingle();
+      const { data: existing } = await supabaseClient.from('portfolios').select('id').eq('slug', slug).neq('id', portfolio.id).maybeSingle();
       if (!existing) break;
       attempt++;
       slug = base + '-' + Math.random().toString(36).slice(2, 5);
@@ -116,7 +116,7 @@ async function publish() {
     }
   }
 
-  const { data, error } = await supabase.from('portfolios')
+  const { data, error } = await supabaseClient.from('portfolios')
     .update({ published: true, slug })
     .eq('id', portfolio.id).select().single();
 
