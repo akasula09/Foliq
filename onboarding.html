@@ -106,13 +106,14 @@
 </div>
 
 <script>
-let supabase, user;
+let supabaseClient, user;
 const state = {};
 
 async function boot() {
   const cfg = await fetch('/api/config').then(r => r.json());
-  supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
-  const { data: { session } } = await supabase.auth.getSession();
+  // window.supabase is provided by the CDN build; avoid shadowing that global name.
+  supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+  const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) { window.location.href = '/login.html'; return; }
   user = session.user;
 }
@@ -181,7 +182,7 @@ async function generate() {
     if (!genRes.ok) throw new Error((await genRes.json()).error || 'Generation failed');
     const portfolioData = await genRes.json();
 
-    const { data: row, error } = await supabase.from('portfolios').insert({
+    const { data: row, error } = await supabaseClient.from('portfolios').insert({
       user_id: user.id,
       name: profile.name,
       age: profile.age,
