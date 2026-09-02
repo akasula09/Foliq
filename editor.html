@@ -36,25 +36,25 @@
   .sect-row button{ background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:14px; padding:2px; }
   .sect-row button:hover{ color:#ff8a8a; }
   .add-sect{ position:relative; margin-top:10px; }
-  .add-menu{ display:none; position:absolute; top:110%; left:0; right:0; background: var(--surface-2); border:1px solid var(--border-strong); border-radius:12px; padding:6px; z-index:20; box-shado[...]
+  .add-menu{ display:none; position:absolute; top:110%; left:0; right:0; background: var(--surface-2); border:1px solid var(--border-strong); border-radius:12px; padding:6px; z-index:20; box-shado[...] 
   .add-menu.show{ display:block; }
   .add-menu button{ display:block; width:100%; text-align:left; background:none; border:none; color:var(--text); padding:9px 10px; border-radius:8px; font-size:13.5px; cursor:pointer; }
   .add-menu button:hover{ background: rgba(255,255,255,.06); }
 
   /* Make canvas iframe fill the available space instead of a small centered preview */
   .canvas-wrap{ background: #060608; display:flex; align-items:stretch; padding:0; overflow:hidden; min-height:0; }
-  .canvas-wrap iframe{ width:100%; height:100%; border:none; border-radius:0; background:#0b0c10; flex:1; min-height:0; }
+  .canvas-wrap iframe{ width:100%; height:100%; border:none; border-radius:0; background:#0b0c10; flex:1; min-height:0; display:block; min-width:0; }
 
   .inspector-empty{ color:var(--text-faint); font-size:13.5px; line-height:1.6; }
   .insp-label{ font-size:13px; font-weight:700; margin-bottom:14px; padding: 8px 12px; background: var(--gradient-soft); border-radius:9px; color:#e7defe; }
   .trigger-opts{ display:flex; gap:6px; margin-bottom:14px; }
-  .trigger-opts button{ flex:1; padding:9px 4px; border-radius:9px; border:1px solid var(--border-strong); background: var(--surface-2); color:var(--text-dim); font-size:12px; font-weight:600; cursor:[...]
+  .trigger-opts button{ flex:1; padding:9px 4px; border-radius:9px; border:1px solid var(--border-strong); background: var(--surface-2); color:var(--text-dim); font-size:12px; font-weight:600; cur[...] 
   .trigger-opts button.active{ background: var(--gradient); color:#fff; border-color:transparent; }
   .delay-row{ display:flex; align-items:center; gap:10px; margin-bottom:18px; }
   .delay-row input[type=range]{ flex:1; }
   .insp-actions{ display:flex; flex-direction:column; gap:8px; margin-top:16px; }
 
-  .toast{ position:fixed; bottom:22px; left:50%; transform: translateX(-50%) translateY(20px); background: var(--surface); border:1px solid var(--border-strong); padding: 12px 20px; border-radius:12px[...]
+  .toast{ position:fixed; bottom:22px; left:50%; transform: translateX(-50%) translateY(20px); background: var(--surface); border:1px solid var(--border-strong); padding: 12px 20px; border-radius:[...] 
   .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
 
   .published-modal{ position:fixed; inset:0; background:rgba(6,6,10,.7); backdrop-filter: blur(6px); display:none; place-items:center; z-index:300; padding:20px; }
@@ -142,8 +142,20 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 1800);
 }
 
+/* ---------------- helper: layout adjustment ---------------- */
+function adjustEditorLayout(){
+  const top = document.querySelector('.topbar');
+  const grid = document.querySelector('.body-grid');
+  if (!top || !grid) return;
+  // Make the middle grid area fill remaining viewport below the topbar
+  const avail = window.innerHeight - top.getBoundingClientRect().height;
+  grid.style.height = Math.max(200, avail) + 'px';
+}
+window.addEventListener('resize', adjustEditorLayout);
+
 /* ---------------- boot ---------------- */
 async function boot() {
+  adjustEditorLayout();
   const cfg = await fetch('/api/config').then(r => r.json());
   supabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -160,6 +172,9 @@ async function boot() {
   buildThemeGrid();
   buildSectionList();
   renderCanvas();
+
+  // adjust once content has been rendered
+  setTimeout(adjustEditorLayout, 50);
 }
 
 /* ---------------- theme grid ---------------- */
@@ -272,6 +287,8 @@ function setMode(m) {
   document.getElementById('tab-edit').classList.toggle('active', m === 'edit');
   document.getElementById('tab-preview').classList.toggle('active', m === 'preview');
   renderCanvas();
+  // small delay to ensure iframe adjusts after switching
+  setTimeout(adjustEditorLayout, 60);
 }
 
 /* ---------------- inspector / selection ---------------- */
