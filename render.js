@@ -151,7 +151,7 @@
     return `<div class="f-item foliq-target"${aa}>
       <div class="f-item-top">
         <h4${fieldAttr(editable, base + '.heading')}>${esc(item.heading)}</h4>
-        ${item.period ? `<span class="f-period"${fieldAttr(editable, base + '.period')}>${esc(item.period)}</span>` : `<span class="f-period muted-period"${fieldAttr(editable, base + '.period')}></span>`}
+        ${item.period ? `<span class="f-period"${fieldAttr(editable, base + '.period')}>${esc(item.period)}</span>` : `<span class="f-period muted-period"${fieldAttr(editable, base + '.period')}>[...]`}
       </div>
       ${item.subheading ? `<div class="f-subheading"${fieldAttr(editable, base + '.subheading')}>${esc(item.subheading)}</div>` : ''}
       ${item.description ? `<p class="f-desc"${fieldAttr(editable, base + '.description')}>${esc(item.description)}</p>` : ''}
@@ -241,6 +241,9 @@
   }
 
   const BRIDGE_CSS = `
+    html,body{ height:100%; margin:0; }
+    /* In the editor iframe (bridge mode) force the document to expand to the iframe size */
+    .f-doc{ max-width: none !important; width:100% !important; margin:0; padding:24px; min-height:100vh; }
     .foliq-target{ position:relative; cursor:pointer; border-radius:10px; transition: box-shadow .12s ease; }
     .foliq-target:hover{ box-shadow: 0 0 0 2px rgba(124,92,255,.45); }
     .foliq-target.foliq-selected{ box-shadow: 0 0 0 2px #7c5cff, 0 0 0 5px rgba(124,92,255,.2) !important; }
